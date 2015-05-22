@@ -1,6 +1,21 @@
 #!/usr/bin/env python
 from gmusicapi import Mobileclient
 
+# returns a list of ids for the same track inside of a single playlist.
+# the first occurence of each track is not included, so that we can pass
+# the returned list right to delete.
+def playlist_track_duplicates(tracks):
+    seen={}
+    dups=[]
+    for track in tracks:
+        trackId = track['trackId'].lower()
+        if trackId in seen:
+            dups.append(track['id'].lower())
+        else:
+            seen[trackId] = track
+    return dups
+    
+    
 def map_track_duplication(tracks):
     album_track_duplicate_map = {}
     for track in tracks:
@@ -38,7 +53,10 @@ def get_duplicate_tracks(all_tracks_by_album, album_track_duplicate_map):
                             titleNorm = track['title'].lower()
                             if titleNorm == track_title and duplicates > 0:
                                 duplicate_tracks.append(track)
-                                print "Queueing for removal: '" + track['title'] + "' from album '" + track['album'] + "' by '" + track['artist']
+                                try:
+                                    print "Queueing for removal: '" + track['title'] + "' from album '" + track['album'] + "' by '" + track['artist']
+                                except UnicodeEncodeError:
+                                    print "Encountered Funky Character.\n";
                                 all_tracks.remove(track)
                                 duplicates += -1
     return duplicate_tracks
@@ -100,5 +118,11 @@ if logged_in:
             deleted_track_ids = api.delete_songs(duplicate_track_ids)
             print "Successfully deleted " + str(len(deleted_track_ids)) + " of " + str(len(duplicate_track_ids)) + " queued songs for removal."
     else:
-        print "I didn't find any duplicate tracks."
+        print "I didn't find any duplicate tracks in Library."
+
+    playlists = api.get_all_user_playlist_contents()
+    for playlist in playlists:
+        dups = playlist_track_duplicates(playlist['tracks'])
+        api.remove_entries_from_playlist(dups)
+        
     print "Thank you!"
